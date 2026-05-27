@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentLight Demo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0d0d0d;
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+  }
+  .demo-badge {
+    font-size: 11px;
+    padding: 4px 10px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 20px;
+    color: #555;
+    letter-spacing: 1px;
+  }
+  #light {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: #2a2a2a;
+    box-shadow: 0 0 30px 8px rgba(50,50,50,0.4);
+    transition: background 0.4s ease, box-shadow 0.4s ease;
+  }
+  #state-label {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    transition: color 0.4s ease;
+  }
+  #info {
+    font-size: 12px;
+    color: #444;
+    letter-spacing: 1px;
+  }
+  h1 {
+    font-size: 13px;
+    font-weight: 400;
+    color: #444;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  /* State: IDLE — dark gray */
+  .state-idle { background: #1e1e1e !important; box-shadow: 0 0 20px 4px rgba(40,40,40,0.5) !important; }
+  .state-idle-label { color: #555 !important; }
+
+  /* State: THINKING — blue with pulse */
+  .state-thinking { background: #3b82f6 !important; box-shadow: 0 0 50px 20px rgba(59,130,246,0.6) !important; animation: pulse-blue 1.5s ease-in-out infinite; }
+  .state-thinking-label { color: #3b82f6 !important; }
+
+  /* State: RUNNING — amber */
+  .state-running { background: #f59e0b !important; box-shadow: 0 0 50px 20px rgba(245,158,11,0.6) !important; animation: pulse-amber 1s ease-in-out infinite; }
+  .state-running-label { color: #f59e0b !important; }
+
+  /* State: SUCCESS — bright green */
+  .state-success { background: #22c55e !important; box-shadow: 0 0 50px 20px rgba(34,197,94,0.6) !important; }
+  .state-success-label { color: #22c55e !important; }
+
+  /* State: ERROR — red with pulse */
+  .state-error { background: #ef4444 !important; box-shadow: 0 0 50px 20px rgba(239,68,68,0.6) !important; animation: pulse-red 0.8s ease-in-out infinite; }
+  .state-error-label { color: #ef4444 !important; }
+
+  @keyframes pulse-blue {
+    0%, 100% { transform: scale(1); }
+    50%       { transform: scale(1.07); }
+  }
+  @keyframes pulse-amber {
+    0%, 100% { transform: scale(1); }
+    50%       { transform: scale(1.07); }
+  }
+  @keyframes pulse-red {
+    0%, 100% { transform: scale(1); }
+    50%       { transform: scale(1.07); }
+  }
+</style>
+</head>
+<body>
+
+  <span class="demo-badge">DEMO MODE</span>
+
+  <div id="light"></div>
+  <div id="state-label">LOADING</div>
+  <div id="info">—</div>
+
+  <h1>AgentLight Demo</h1>
+
+<script>
+const DEMO_FILE = 'agentlight-state.json';
+
+function applyState(s) {
+  var light = document.getElementById('light');
+  var label = document.getElementById('state-label');
+  var info  = document.getElementById('info');
+
+  // Remove all state classes
+  light.className = '';
+  label.className = '';
+
+  // Apply new state class
+  var stateClass = 'state-' + s;
+  light.classList.add(stateClass);
+  label.classList.add(stateClass + '-label');
+
+  // Set text
+  label.textContent = s.toUpperCase();
+
+  // Update info with source + time
+  var t = window._lastUpdated || null;
+  if (t) {
+    var d = new Date(t);
+    info.textContent = 'source: ' + (window._lastSource || '?') + '  ·  ' + d.toLocaleTimeString();
+  }
+}
+
+function update() {
+  fetch(DEMO_FILE + '?t=' + Date.now())
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      // Use lastEvent.state if available, fall back to top-level state
+      var s = data.lastEvent ? data.lastEvent.state : data.state;
+      s = (s || 'idle').toLowerCase();
+
+      // Track source and time for display
+      if (data.lastEvent) {
+        window._lastSource = data.lastEvent.source;
+        window._lastUpdated = data.lastEvent.updatedAt;
+      } else {
+        window._lastSource = data.source;
+        window._lastUpdated = data.updatedAt;
+      }
+
+      applyState(s);
+
+      console.log('[AgentLight] state:', s, 'at', new Date().toISOString());
+    })
+    .catch(function() { console.warn('[AgentLight] poll failed'); });
+}
+
+// Initial apply
+applyState('idle');
+// Start polling
+update();
+setInterval(update, 500);
+</script>
+</body>
+</html>

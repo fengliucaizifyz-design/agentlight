@@ -1,0 +1,28 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Node
+node_modules/
+
+# OpenClaw (user-specific, don't include in repo)
+.openclaw/
+hooks/agentlight/
+
+# Demo state (regenerated at runtime)
+examples/agentlight-state.json
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary
+tmp/
+.temp/
