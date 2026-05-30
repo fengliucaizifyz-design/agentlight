@@ -11,8 +11,8 @@ idle, working, waiting for your confirmation, or errored.
 Works with **Claude Code**, **Codex**, and **OpenClaw** — they all report into one small
 local hub, so the color means the same thing no matter which agent you're running.
 
-> **Status:** v1 ships the hub + menu-bar light + the **Claude Code** adapter (verified).
-> Codex and OpenClaw adapters are included as experimental and being finished next.
+> **Status:** the hub + menu-bar light + the **Claude Code** and **OpenClaw** adapters are
+> verified. The Codex adapter is an experimental draft (depends on your Codex version).
 > WLED physical-light output is built in and activates once you point it at a light.
 
 ## How it works
@@ -103,9 +103,9 @@ agentlight/
 │   ├── build.sh
 │   └── AgentLight.app/
 ├── adapters/                    # one input adapter per agent
-│   ├── claude-code/             # ✅ v1 — hooks snippet + installer
-│   ├── codex/                   # 🔜 experimental
-│   └── openclaw/                # 🔜 experimental — hook handler
+│   ├── claude-code/             # ✅ verified — hooks snippet + installer
+│   ├── codex/                   # 🔜 experimental draft (version-dependent)
+│   └── openclaw/                # ✅ verified — hook handler + installer
 ├── examples/
 │   └── demo.html                # browser demo (polls the hub)
 ├── docs/
