@@ -18,6 +18,9 @@ examples/agentlight-state.json
 # Built hub binary (run hub/build.sh to produce it)
 hub/AgentLight.app/Contents/MacOS/AgentLight
 
+# Ad-hoc code signature (regenerated on build/sign)
+hub/AgentLight.app/Contents/_CodeSignature/
+
 # Settings backups created by adapter installers
 *.agentlight.bak
 

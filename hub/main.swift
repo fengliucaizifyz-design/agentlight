@@ -125,10 +125,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        render()
+        statusItem.isVisible = true
 
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "AgentLight", action: nil, keyEquivalent: ""))
+        // First line shows the full status (agent + state + detail); updated in render().
+        let statusLine = NSMenuItem(title: "AgentLight", action: nil, keyEquivalent: "")
+        statusLine.tag = 88
+        menu.addItem(statusLine)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Set Physical Light (WLED) IP…",
                                 action: #selector(setWledIP), keyEquivalent: ""))
@@ -140,6 +143,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
         statusItem.menu = menu
+
+        render()
 
         // Start the HTTP hub
         HTTPServer.shared.onState = { [weak self] state, source, detail in
@@ -167,8 +172,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func render() {
         let style = STATES[currentState] ?? STATES["offline"]!
         let name = displayName(forSource: currentSource)
-        statusItem.button?.title = "\(name) \(style.emoji) \(style.label)"
-        statusItem.button?.toolTip = currentDetail
+        // Menu bar: just the colored dot — compact so it never overflows a busy /
+        // notched menu bar. Full status lives in the tooltip and the dropdown.
+        statusItem.button?.title = style.emoji
+        var full = "\(name) \(style.emoji) \(style.label)"
+        if let d = currentDetail, !d.isEmpty { full += " — \(d)" }
+        statusItem.button?.toolTip = full
+        statusItem.menu?.item(withTag: 88)?.title = full
     }
 
     @objc func setWledIP() {
