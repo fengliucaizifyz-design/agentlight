@@ -24,7 +24,15 @@
         ]
       }
     ],
-    "Notification": [
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"working\",\"source\":\"claude-code\"}'" }
+        ]
+      }
+    ],
+    "PermissionRequest": [
       {
         "matcher": "",
         "hooks": [

@@ -27,10 +27,13 @@ Maps Claude Code hook events to states:
 | Hook event | State |
 |---|---|
 | `SessionStart` | idle |
-| `UserPromptSubmit`, `PreToolUse` | working |
-| `Notification` (permission) | confirm |
+| `UserPromptSubmit`, `PreToolUse`, `PostToolUse` | working |
+| `PermissionRequest` (permission dialog) | confirm |
 | `Stop` | idle |
 | `SessionEnd` | offline |
+
+Note: `PostToolUse` re-asserts `working` after a tool finishes, so the light leaves
+the blue `confirm` state once you approve a permission and the tool runs.
 
 Each hook is a `curl` POST. Install with `adapters/claude-code/install.sh` (merges the
 snippet into a `settings.json`).
