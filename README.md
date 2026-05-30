@@ -15,6 +15,16 @@ local hub, so the color means the same thing no matter which agent you're runnin
 > verified. The Codex adapter is an experimental draft (depends on your Codex version).
 > WLED physical-light output is built in and activates once you point it at a light.
 
+## Easiest install: let your agent do it
+
+You already have an AI coding agent — just tell it to install this. Paste into your agent:
+
+> Read https://github.com/fengliucaizifyz-design/agentlight/blob/main/AGENT-INSTALL.md and follow it for your platform.
+
+The agent reads [AGENT-INSTALL.md](AGENT-INSTALL.md) and sets everything up: builds & starts
+the hub, wires its own hooks, and (if you have one) pairs the physical WiFi light. The
+manual steps below are for doing it yourself.
+
 ## How it works
 
 ```
