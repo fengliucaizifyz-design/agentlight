@@ -4,8 +4,9 @@
  * Maps OpenClaw internal events to AgentLight states and POSTs them to the
  * local AgentLight hub (http://localhost:9527). No external CLI required.
  *
- * Status: experimental. The hub + Claude Code adapter are the verified v1;
- * this OpenClaw mapping is being finished — see docs/DESIGN.md.
+ * Verified against OpenClaw 2026.5.12: the hook is discovered/enabled by the
+ * `openclaw hooks` system and the handler POSTs the mapped states to the hub.
+ * See docs/DESIGN.md.
  */
 
 interface HookEvent {
@@ -19,15 +20,16 @@ interface HookEvent {
   };
 }
 
-// OpenClaw event -> canonical AgentLight state (idle|working|confirm|error|offline)
+// OpenClaw event ("<type>:<action>") -> canonical AgentLight state.
+// Event types/actions verified against OpenClaw 2026.5.12's internal hook API.
+// Note: there is no "gateway:shutdown" event, so offline is not emitted here.
 const STATE_MAP: Record<string, string> = {
-  "message:received": "working",
-  "message:sent":     "idle",
-  "command:new":      "working",
-  "command:reset":    "idle",
-  "command:stop":     "idle",
-  "gateway:startup":  "idle",
-  "gateway:shutdown": "offline",
+  "message:received": "working",  // user message arrived → agent starts working
+  "message:sent":     "idle",     // agent replied → done
+  "command:new":      "idle",     // /new clears the session
+  "command:reset":    "idle",     // /reset
+  "command:stop":     "idle",     // /stop halts generation
+  "gateway:startup":  "idle",     // gateway ready
 };
 
 // Hub endpoint — override with AGENTLIGHT_HUB if the hub runs elsewhere.

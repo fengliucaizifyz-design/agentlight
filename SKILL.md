@@ -12,7 +12,7 @@ from OpenClaw's internal hook system. When OpenClaw processes a message or comma
 hook POSTs the matching state to the local AgentLight hub (`http://localhost:9527`), which
 updates the macOS menu-bar light and any connected WLED light.
 
-> Status: experimental. The verified v1 is the hub + Claude Code adapter.
+> Verified against OpenClaw 2026.5.12.
 
 ## What it does
 
@@ -20,10 +20,8 @@ updates the macOS menu-bar light and any connected WLED light.
 |---|---|---|
 | Message received | working | 🟡 Amber |
 | Message sent | idle | 🟢 Green |
-| `/new` command | working | 🟡 Amber |
-| `/reset` or `/stop` | idle | 🟢 Green |
+| `/new`, `/reset`, `/stop` | idle | 🟢 Green |
 | Gateway startup | idle | 🟢 Green |
-| Gateway shutdown | offline | ⚪️ Gray |
 
 ## Prerequisites
 

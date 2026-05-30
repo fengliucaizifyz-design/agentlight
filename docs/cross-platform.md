@@ -12,9 +12,9 @@ agent events ──(translate)──► POST localhost:9527/state ──► hub 
 
 | Agent | Mechanism | Status |
 |---|---|---|
-| **Claude Code** | hooks in `settings.json` → `curl` | ✅ v1, verified |
-| **Codex** | hooks in `~/.codex/config.toml` → `curl` | 🔜 experimental |
-| **OpenClaw** | internal hook handler (`handler.ts`) → `fetch` | 🔜 experimental |
+| **Claude Code** | hooks in `settings.json` → `curl` | ✅ verified |
+| **OpenClaw** | internal hook handler (`handler.ts`) → `fetch` | ✅ verified |
+| **Codex** | `[hooks]` or `notify` in `~/.codex/config.toml` → `curl` | 🔜 experimental (version-dependent) |
 
 ## Canonical states
 
