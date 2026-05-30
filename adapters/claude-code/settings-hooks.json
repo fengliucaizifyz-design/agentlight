@@ -1,0 +1,52 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"idle\",\"source\":\"claude-code\"}'" }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"working\",\"source\":\"claude-code\"}'" }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"working\",\"source\":\"claude-code\"}'" }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"confirm\",\"source\":\"claude-code\"}'" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"idle\",\"source\":\"claude-code\"}'" }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"offline\",\"source\":\"claude-code\"}'" }
+        ]
+      }
+    ]
+  }
+}

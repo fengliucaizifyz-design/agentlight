@@ -1,89 +1,55 @@
 ---
 name: openclaw-agentlight
-description: Drive AgentLight status LED from OpenClaw internal hooks. Maps message, command, and gateway lifecycle events to LED states (thinking/success/idle/error) with a browser demo page.
+description: Drive the AgentLight status light from OpenClaw internal hooks. Maps message, command, and gateway lifecycle events to states (idle/working/confirm/error/offline) and POSTs them to the local hub. Includes a browser demo page.
 metadata:
-  { "openclaw": { "requires": { "bins": ["agentlight"] }, "events": ["message:received", "message:sent", "command:new", "command:reset", "command:stop", "gateway:startup", "gateway:shutdown"] } }
+  { "openclaw": { "events": ["message:received", "message:sent", "command:new", "command:reset", "command:stop", "gateway:startup", "gateway:shutdown"] } }
 ---
 
 # openclaw-agentlight
 
-Drive an [AgentLight](https://github.com/tifosi/agentlight) status LED from OpenClaw's internal hook system. When OpenClaw processes a message, the LED changes color automatically. Includes a browser demo page so you can see the state without real hardware.
+Drive the [AgentLight](https://github.com/fengliucaizifyz-design/agentlight) status light
+from OpenClaw's internal hook system. When OpenClaw processes a message or command, the
+hook POSTs the matching state to the local AgentLight hub (`http://localhost:9527`), which
+updates the macOS menu-bar light and any connected WLED light.
+
+> Status: experimental. The verified v1 is the hub + Claude Code adapter.
 
 ## What it does
 
-| OpenClaw Event | → LED State | Color |
+| OpenClaw event | → State | Color |
 |---|---|---|
-| Message received | thinking | 🔵 Blue (pulsing) |
-| Message sent | success | 🟢 Green |
-| `/new` command | thinking | 🔵 Blue |
-| `/reset` or `/stop` | idle | ⚫ Gray |
-| Gateway startup/shutdown | idle | ⚫ Gray |
+| Message received | working | 🟡 Amber |
+| Message sent | idle | 🟢 Green |
+| `/new` command | working | 🟡 Amber |
+| `/reset` or `/stop` | idle | 🟢 Green |
+| Gateway startup | idle | 🟢 Green |
+| Gateway shutdown | offline | ⚪️ Gray |
 
 ## Prerequisites
 
-- **AgentLight CLI** must be installed:
-  ```bash
-  agentlight --help   # confirm it works
-  ```
+- The AgentLight hub running (`agentlight/hub/AgentLight.app`). No separate CLI needed.
 
-## Installation (one command)
-
-```bash
-cd ~/.openclaw/workspace/openclaw-agentlight
-./scripts/install-openclaw-hook.sh
-```
-
-Or manually:
+## Installation
 
 ```bash
 # 1. Copy hook files
 mkdir -p ~/.openclaw/hooks/agentlight
-cp -r hooks/agentlight/. ~/.openclaw/hooks/agentlight/
+cp adapters/openclaw/. ~/.openclaw/hooks/agentlight/ -r
 
 # 2. Enable the hook
 openclaw hooks enable agentlight
 
-# 3. Restart gateway
+# 3. Restart the gateway
 openclaw gateway restart
 ```
 
-## Demo mode (no hardware needed)
+## Demo (no hardware needed)
 
-The hook runs in `--demo` mode by default — it writes state to a JSON file instead of sending to USB. To see the demo:
-
-```bash
-# Start a web server
-cd ~/.openclaw/workspace
-python3 -m http.server 8080
-
-# Open in browser
-open http://localhost:8080/examples/agentlight.html
-```
-
-The demo page shows a colored circle that updates in real-time as OpenClaw events fire.
-
-## Manual state control
+With the hub running:
 
 ```bash
-agentlight set thinking --source openclaw --session test --demo
-agentlight set success  --source openclaw --session test --demo
-agentlight reset        --demo
-```
-
-## Files
-
-```
-openclaw-agentlight/
-├── SKILL.md                       ← You are here
-├── README.md
-├── examples/
-│   └── agentlight-state.json      ← Demo state file (written by hook)
-├── hooks/
-│   └── agentlight/
-│       ├── HOOK.md                ← Hook metadata
-│       └── handler.ts            ← Event handler
-└── scripts/
-    └── install-openclaw-hook.sh  ← One-command installer
+cd examples && python3 -m http.server 8099
+open http://localhost:8099/demo.html
 ```
 
 ## Uninstall
