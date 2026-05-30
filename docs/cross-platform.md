@@ -1,74 +1,63 @@
-# Cross-Platform Support
+# Adapters: mapping agent events → states
 
-This project focuses on OpenClaw. Here are notes on supporting other AI coding agents.
-
-## Architecture
-
-AgentLight has two layers:
+AgentLight decouples *inputs* (agents) from *outputs* (menu bar, WLED) via the hub. Each
+agent only needs to translate its lifecycle events into one of the five canonical states
+and `POST` it to `http://localhost:9527/state`. Adding a new agent = writing one adapter.
 
 ```
-Layer 1: Event Source    (OpenClaw hook, Claude Code hook, etc.)
-    ↓
-Layer 2: agentlight CLI (state → LED)
+agent events ──(translate)──► POST localhost:9527/state ──► hub ──► lights
 ```
 
-Any tool that can call `agentlight set <state>` can drive the LED. The event source is the only variable.
+## Status
 
-## Platform Comparison
-
-| Platform | Event Source | Status |
+| Agent | Mechanism | Status |
 |---|---|---|
-| **OpenClaw** | Internal hook system | ✅ Native |
-| **Claude Code** | `~/.claude/hooks/` | 🔜 Planned |
-| **GitHub Copilot** | Workspace file events | 🔜 Planned |
-| **Codex (OpenAI)** | No hook system | 🔜 Planned |
+| **Claude Code** | hooks in `settings.json` → `curl` | ✅ v1, verified |
+| **Codex** | hooks in `~/.codex/config.toml` → `curl` | 🔜 experimental |
+| **OpenClaw** | internal hook handler (`handler.ts`) → `fetch` | 🔜 experimental |
 
-## OpenClaw (done)
+## Canonical states
 
-The OpenClaw hook (`openclaw/hooks/agentlight/handler.ts`) listens to:
-- `message:received`
-- `message:sent`
-- `command:new`
-- `command:reset`
-- `command:stop`
-- `gateway:startup`
-- `gateway:shutdown`
+`idle` · `working` · `confirm` · `error` · `offline` — see the README for colors.
 
-## Claude Code (planned)
+## Claude Code (`adapters/claude-code/`)
 
-Claude Code supports hooks in `~/.claude/hooks/<name>/`. The hook receives events via stdin. A Claude Code bridge would:
-1. Listen for tool calls and status changes
-2. Map them to `agentlight set <state>` calls
+Maps Claude Code hook events to states:
 
-```bash
-# Claude Code hook skeleton (when implemented)
-#!/bin/bash
-while read event; do
-  type=$(echo "$event" | jq -r '.type')
-  case "$type" in
-    "tool_call") agentlight set thinking --source claude-code --session "$session" ;;
-    "tool_result") agentlight set success --source claude-code --session "$session" ;;
-  esac
-done
-```
+| Hook event | State |
+|---|---|
+| `SessionStart` | idle |
+| `UserPromptSubmit`, `PreToolUse` | working |
+| `Notification` (permission) | confirm |
+| `Stop` | idle |
+| `SessionEnd` | offline |
 
-## GitHub Copilot (planned)
+Each hook is a `curl` POST. Install with `adapters/claude-code/install.sh` (merges the
+snippet into a `settings.json`).
 
-Copilot doesn't have a hook system, but you can watch workspace file changes:
+## Codex (`adapters/codex/`)
 
-```bash
-# File watcher approach (when implemented)
-#!/bin/bash
-fswatch -o . | while read; do
-  agentlight set thinking --source copilot --session "$session"
-  sleep 0.5
-  agentlight set success --source copilot --session "$session"
-done
-```
+Codex's hook system (`[hooks]` in `~/.codex/config.toml`, enabled with
+`[features] codex_hooks = true`) exposes events comparable to Claude Code:
 
-## Contributing
+| Hook event | State |
+|---|---|
+| `SessionStart` | idle |
+| `UserPromptSubmit`, `PreToolUse` | working |
+| `PermissionRequest` | confirm |
+| `PostToolUse` (failure) | error |
+| `Stop` / session end | idle / offline |
 
-If you want to implement a bridge for another platform, the pattern is:
-1. Find how the platform exposes events (hooks, files, stdout, etc.)
-2. Map those events to `agentlight set <state>` calls
-3. Add installation docs for that platform
+Exact event names should be confirmed against your installed Codex version.
+
+## OpenClaw (`adapters/openclaw/`)
+
+An internal hook handler (`handler.ts`) that `fetch`es the hub. See
+[adapters/openclaw/HOOK.md](../adapters/openclaw/HOOK.md) for the event mapping. OpenClaw
+has no permission-confirmation event, so `confirm` is not triggered there.
+
+## Writing a new adapter
+
+1. Find how the platform exposes lifecycle events (hooks, config, files, stdout…).
+2. Translate each event to a canonical state.
+3. `POST {"state": "...", "source": "<agent>"}` to `http://localhost:9527/state`.

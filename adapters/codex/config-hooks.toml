@@ -1,0 +1,28 @@
+# AgentLight — Codex adapter (EXPERIMENTAL DRAFT)
+#
+# Merge into ~/.codex/config.toml. Requires:
+#   [features]
+#   codex_hooks = true
+#
+# Each hook POSTs a state to the local AgentLight hub. Event names and the exact
+# hook-entry schema vary by Codex version — verify against your install:
+#   https://developers.openai.com/codex/hooks
+#
+# Helper used below (keeps the lines short); define once:
+#   AGENTLIGHT() { curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state \
+#     -H 'Content-Type: application/json' -d "{\"state\":\"$1\",\"source\":\"codex\"}"; }
+
+[[hooks.SessionStart]]
+command = "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"idle\",\"source\":\"codex\"}'"
+
+[[hooks.UserPromptSubmit]]
+command = "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"working\",\"source\":\"codex\"}'"
+
+[[hooks.PreToolUse]]
+command = "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"working\",\"source\":\"codex\"}'"
+
+[[hooks.PermissionRequest]]
+command = "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"confirm\",\"source\":\"codex\"}'"
+
+[[hooks.Stop]]
+command = "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"idle\",\"source\":\"codex\"}'"

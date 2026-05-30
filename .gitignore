@@ -11,10 +11,15 @@ node_modules/
 
 # OpenClaw (user-specific, don't include in repo)
 .openclaw/
-hooks/agentlight/
 
 # Demo state (regenerated at runtime)
 examples/agentlight-state.json
+
+# Built hub binary (run hub/build.sh to produce it)
+hub/AgentLight.app/Contents/MacOS/AgentLight
+
+# Settings backups created by adapter installers
+*.agentlight.bak
 
 # Editor
 .vscode/

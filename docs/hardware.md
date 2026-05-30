@@ -1,88 +1,62 @@
-# Hardware Build Guide
+# Physical Light Guide (WLED)
 
-This doc explains how to build a physical AgentLight LED unit.
+AgentLight drives a real light over your LAN using [WLED](https://kno.wled.ge/) — a free,
+open-source firmware that runs on cheap ESP32/ESP8266 boards and exposes a simple local
+HTTP/JSON API. No cloud, no account, no soldering required if you buy a ready-made unit.
 
-## Overview
+## Why WLED
+
+The hub controls the light by sending one HTTP request per state change:
 
 ```
-agentlight CLI  ←  OpenClaw hook
-      │
-      │ USB (HID)
-      ▼
-  Arduino/ESP32
-      │
-      │ GPIO
-      ▼
-  RGB LED or WS2812 strip
+POST http://<WLED_IP>/json/state
+{"on": true, "bri": 160, "seg": [{"col": [[R, G, B]]}]}
 ```
 
-## Hardware Options
+That's the whole integration. Any WLED device on the same network works — no per-device
+protocol, no vendor lock-in. Smart bulbs (Mi/Tuya/etc.) are intentionally *not* used: their
+APIs vary, often require the cloud, and can be locked down by the vendor.
 
-### Option A: Arduino Leonardo (simplest)
+## What to buy
 
-**Parts:**
-- Arduino Leonardo (or Pro Micro)
-- 3× LEDs: red, green, blue (or 1× RGB LED common cathode)
-- 3× 220Ω resistors
-- Breadboard + wires
+The cheapest reliable path is an **ESP32/ESP8266 + WS2812B/SK6812 RGB light, flashed with
+WLED**. On Taobao/AliExpress, search **“WLED 灯” / “WLED ESP32 ambient light”** — many
+sellers ship units **pre-flashed**, so setup is just Wi-Fi onboarding.
 
-**Wiring:**
-```
-Arduino Pin 2 → 220Ω → Red LED → GND
-Arduino Pin 3 → 220Ω → Green LED → GND
-Arduino Pin 4 → 220Ω → Blue LED → GND
-```
+Requirements checklist when buying:
 
-**Firmware:** Use AgentLight's Arduino HID firmware. Flash it via Arduino IDE.
+- Controller: **ESP32 or ESP8266**, **2.4 GHz Wi-Fi**.
+- LEDs: WS2812B or SK6812 addressable RGB (a few LEDs or a ring — anything that changes
+  color as a whole is fine).
+- Firmware: **WLED (latest stable), JSON API enabled** (it is by default).
+- Onboarding: WLED's built-in Wi-Fi AP setup (connect to its hotspot, enter your Wi-Fi).
+- Power: USB Type-C with cable.
+- Optional: a frosted diffuser for a softer glow.
 
-### Option B: ESP32 (WiFi)
+Typical cost: about ¥30–100.
 
-**Parts:**
-- ESP32 DevKit
-- WS2812B RGB LED strip (e.g., 3 LEDs)
-- 5V power supply
+## Setup
 
-**Why ESP32:** No USB cable needed — the hook sends commands over WiFi.
+1. Power the light. Connect your phone to its Wi-Fi hotspot and join it to your 2.4 GHz
+   network (WLED's standard onboarding).
+2. Find its LAN IP (your router's client list, or the WLED app). Confirm you can open
+   `http://<IP>/` in a browser and see the WLED control page.
+3. In the AgentLight menu bar, choose **“Set Physical Light (WLED) IP…”** and enter the IP.
 
-### Option C: USB + Python (lightweight)
+State changes now mirror to the light. If the light is off or unreachable, the hub silently
+skips it — the menu-bar light is unaffected.
 
-If you have a USB-to-serial adapter:
+## Colors
 
-```bash
-pip install agentlight[hardware]
-agentlight serve --device /dev/ttyUSB0
-```
+| State | RGB |
+|---|---|
+| `idle`    | (0, 200, 0)    |
+| `working` | (255, 180, 0)  |
+| `confirm` | (0, 120, 255)  |
+| `error`   | (255, 0, 0)    |
+| `offline` | off            |
 
-This runs a background server that listens for agentlight commands and drives LEDs over serial.
+## Roadmap
 
-## AgentLight CLI Modes
-
-| Mode | Flag | Description |
-|---|---|---|
-| Demo | `--demo` | Writes state to JSON file |
-| USB | (default, no flag) | Sends to hardware via USB HID |
-| Serial | `--serial /dev/ttyX` | Sends over serial port |
-
-## Customization
-
-### Custom LED states
-
-Edit `openclaw/hooks/agentlight/handler.ts` to map events differently:
-
-```typescript
-const STATE_MAP: Record<string, string> = {
-  "message:received": "thinking",
-  "message:sent":     "success",
-  "command:new":      "running",  // changed from "thinking"
-  "command:reset":    "idle",
-  "command:stop":     "idle",
-  "gateway:startup":  "idle",
-  "gateway:shutdown": "idle",
-};
-```
-
-Rebuild: just copy the updated `handler.ts` to `~/.openclaw/hooks/agentlight/`.
-
-### Custom animations
-
-The AgentLight firmware supports custom animation sequences. See the firmware source for details.
+- Brightness "breathing" for `working` / `confirm` / `error` (pulse effect on the light).
+- Bluetooth (BLE) light support as an alternative to Wi-Fi.
