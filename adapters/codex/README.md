@@ -1,21 +1,27 @@
-# Codex adapter (experimental)
+# Codex adapter
 
-Maps [Codex CLI](https://developers.openai.com/codex/) lifecycle hooks to AgentLight states
-by POSTing to the local hub (`http://localhost:9527/state`).
+Maps Codex lifecycle hooks to AgentLight states by POSTing to the local hub
+(`http://localhost:9527/state`) with `source: "codex"`.
 
-> **Status: experimental / draft.** The hub + Claude Code adapter are the verified v1.
-> Codex's hook system is newer; **confirm the exact event names and TOML schema against
-> your installed Codex version** before relying on this. See
-> [Codex Hooks docs](https://developers.openai.com/codex/hooks).
+This adapter was verified on macOS with Codex v0.135.0-alpha.1. Codex hooks are enabled by
+default in this version; the old `codex_hooks` feature flag is deprecated. See the
+[Codex Hooks docs](https://developers.openai.com/codex/hooks).
 
-## Enable hooks in Codex
+## Install
 
-Codex hooks require a feature flag in `~/.codex/config.toml`:
-
-```toml
-[features]
-codex_hooks = true
+```bash
+~/agentlight/adapters/codex/install.sh
 ```
+
+The installer:
+
+- copies `agentlight-state.sh` to `~/.codex/hooks/agentlight-state.sh`
+- appends the verified hook block from `config-hooks.toml` to `~/.codex/config.toml`
+- preserves existing Codex settings, including any existing `notify = [...]`
+
+After installing, restart Codex or open a new Codex session. If Codex shows **"Hooks need
+review"**, choose **"Trust all and continue"**. In the Codex TUI you can also run `/hooks`
+to review and trust hooks.
 
 ## Event → state mapping
 
@@ -24,40 +30,46 @@ codex_hooks = true
 | `SessionStart` | idle |
 | `UserPromptSubmit`, `PreToolUse` | working |
 | `PermissionRequest` | confirm |
-| `PostToolUse` (on failure) | error |
-| `Stop` / session end | idle / offline |
+| `PostToolUse` | working |
+| `Stop` | idle |
 
-## Draft config
+Important: in Codex, `Stop` means the current turn has stopped, not that the whole Codex app
+has quit. Mapping `Stop` to `offline` makes the light turn gray after every answer. The
+verified behavior is yellow while Codex works, then green when the turn is done.
 
-See [`config-hooks.toml`](config-hooks.toml) for a starting point. Each hook runs a `curl`
-that POSTs the state. Merge the relevant blocks into `~/.codex/config.toml` and adjust the
-event/command keys to match your Codex version.
+## Manual install
 
-## Alternative: `notify` (older / more widely available, but limited)
+If you do not want to run the installer, copy `agentlight-state.sh` to:
 
-Older Codex builds (and some current ones) don't have the `[hooks]` system — they only
-support a single `notify` program that fires on `turn-ended`:
-
-```toml
-notify = ["/path/to/agentlight-notify.sh", "turn-ended"]
+```bash
+mkdir -p ~/.codex/hooks
+cp ~/agentlight/adapters/codex/agentlight-state.sh ~/.codex/hooks/
+chmod +x ~/.codex/hooks/agentlight-state.sh
 ```
 
-Limitations:
+Then append the contents of [`config-hooks.toml`](config-hooks.toml) to
+`~/.codex/config.toml`.
 
-- **Only fires at turn end** → you can really only signal `idle` (turn done). You don't
-  get `working` / `confirm` / `error` from `notify` alone.
-- **`notify` is a single slot.** If you already use it (e.g. a desktop notifier or a
-  computer-use client), setting it here **overwrites** that. Don't clobber it — instead
-  point `notify` at a small wrapper script that calls your existing program *and* POSTs to
-  the hub:
+Do not replace `~/.codex/config.toml`, and do not remove or overwrite an existing
+`notify = [...]` entry. Codex `notify` is separate from hooks and may already be used by
+other integrations such as computer-use.
 
-  ```bash
-  #!/bin/bash
-  # agentlight-notify.sh
-  "/path/to/your/existing/notifier" "$@"   # keep your current behavior
-  curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state \
-    -H 'Content-Type: application/json' -d '{"state":"idle","source":"codex"}'
-  ```
+## Verify
 
-Prefer the `[hooks]` config above when your Codex version supports it — it gives the full
-five states. Use `notify` only as a fallback.
+Use Codex to run a tool, then read the hub:
+
+```bash
+curl -s http://localhost:9527/state
+```
+
+During work it should include:
+
+```json
+{"state":"working","source":"codex"}
+```
+
+After the turn stops it should return to:
+
+```json
+{"state":"idle","source":"codex"}
+```

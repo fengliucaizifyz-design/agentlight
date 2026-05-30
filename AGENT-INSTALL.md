@@ -61,11 +61,14 @@ Then tell the user to run **`openclaw gateway restart`** (it briefly interrupts 
 After that, sending a message to the agent drives the light.
 
 ### You are Codex
-Codex's hook loading is still being finalized — see
-[`adapters/codex/README.md`](adapters/codex/README.md). In short: write the hook config to
-`~/.codex/hooks.json`, then the user may need to **approve/trust the hooks inside the Codex
-app**. Do **not** modify the existing `notify` setting. Verify with
-`curl -s http://localhost:9527/state` showing `"source":"codex"` after you use a tool.
+```bash
+~/agentlight/adapters/codex/install.sh              # appends hooks to ~/.codex/config.toml
+```
+Then tell the user: **restart Codex or open a new Codex session**. If Codex shows
+**"Hooks need review"**, choose **"Trust all and continue"**. Do **not** modify the existing
+`notify` setting; it may already be used by computer-use or another integration.
+Verify after a tool call with `curl -s http://localhost:9527/state` showing
+`"source":"codex"`.
 
 ## Step 3 — (Optional) the physical WiFi light
 
@@ -93,5 +96,5 @@ turn 🔵.
 ~/agentlight/scripts/install-autostart.sh --uninstall   # stop auto-start
 # Claude Code: remove the AgentLight hooks from ~/.claude/settings.json
 # OpenClaw:   openclaw hooks disable agentlight
-# Codex:      rm ~/.codex/hooks.json
+# Codex:      remove the AgentLight block from ~/.codex/config.toml and delete ~/.codex/hooks/agentlight-state.sh
 ```
