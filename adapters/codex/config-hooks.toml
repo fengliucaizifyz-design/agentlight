@@ -1,28 +1,63 @@
-# AgentLight — Codex adapter (EXPERIMENTAL DRAFT)
+# AgentLight - Codex hooks
 #
-# Merge into ~/.codex/config.toml. Requires:
-#   [features]
-#   codex_hooks = true
+# Verified with Codex v0.135.0-alpha.1 on macOS.
+# Merge this block into ~/.codex/config.toml. Do not replace the file, and do
+# not remove an existing `notify = [...]` setting.
 #
-# Each hook POSTs a state to the local AgentLight hub. Event names and the exact
-# hook-entry schema vary by Codex version — verify against your install:
-#   https://developers.openai.com/codex/hooks
-#
-# Helper used below (keeps the lines short); define once:
-#   AGENTLIGHT() { curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state \
-#     -H 'Content-Type: application/json' -d "{\"state\":\"$1\",\"source\":\"codex\"}"; }
+# The command hooks are reviewed by Codex before they run. After installing or
+# changing this block, open Codex and choose "Trust all and continue" when the
+# "Hooks need review" prompt appears, or run `/hooks` in the Codex TUI.
 
 [[hooks.SessionStart]]
-command = "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"idle\",\"source\":\"codex\"}'"
+matcher = ".*"
+
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "sh -c '${CODEX_HOME:-$HOME/.codex}/hooks/agentlight-state.sh idle'"
+timeout = 2
+statusMessage = "AgentLight idle"
 
 [[hooks.UserPromptSubmit]]
-command = "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"working\",\"source\":\"codex\"}'"
+matcher = ".*"
+
+[[hooks.UserPromptSubmit.hooks]]
+type = "command"
+command = "sh -c '${CODEX_HOME:-$HOME/.codex}/hooks/agentlight-state.sh working'"
+timeout = 2
+statusMessage = "AgentLight working"
 
 [[hooks.PreToolUse]]
-command = "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"working\",\"source\":\"codex\"}'"
+matcher = ".*"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "sh -c '${CODEX_HOME:-$HOME/.codex}/hooks/agentlight-state.sh working'"
+timeout = 2
+statusMessage = "AgentLight working"
 
 [[hooks.PermissionRequest]]
-command = "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"confirm\",\"source\":\"codex\"}'"
+matcher = ".*"
+
+[[hooks.PermissionRequest.hooks]]
+type = "command"
+command = "sh -c '${CODEX_HOME:-$HOME/.codex}/hooks/agentlight-state.sh confirm'"
+timeout = 2
+statusMessage = "AgentLight confirm"
+
+[[hooks.PostToolUse]]
+matcher = ".*"
+
+[[hooks.PostToolUse.hooks]]
+type = "command"
+command = "sh -c '${CODEX_HOME:-$HOME/.codex}/hooks/agentlight-state.sh working'"
+timeout = 2
+statusMessage = "AgentLight working"
 
 [[hooks.Stop]]
-command = "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"idle\",\"source\":\"codex\"}'"
+matcher = ".*"
+
+[[hooks.Stop.hooks]]
+type = "command"
+command = "sh -c '${CODEX_HOME:-$HOME/.codex}/hooks/agentlight-state.sh idle'"
+timeout = 2
+statusMessage = "AgentLight idle"
