@@ -39,6 +39,9 @@ Each agent's lifecycle hooks `POST` a state to a local HTTP server on `:9527`. T
 renders it in the menu bar and, if you've set a WLED light's IP, pushes the matching color
 to it over your LAN. No cloud, no account, no external CLI.
 
+The OpenClaw adapter posts to `127.0.0.1` with Node's `http` module so local hub updates
+are not routed through `HTTP_PROXY` / undici proxy settings.
+
 ## State → color
 
 | State | Color | Meaning | Example trigger |
