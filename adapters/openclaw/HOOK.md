@@ -9,7 +9,9 @@ metadata:
 
 Drives the [AgentLight](https://github.com/fengliucaizifyz-design/agentlight) status light
 based on OpenClaw agent events. The handler POSTs the mapped state to the local AgentLight
-hub at `http://localhost:9527/state` — no external CLI or hardware required.
+hub at `http://127.0.0.1:9527/state` using Node's `http` module, so local requests are
+not intercepted by `HTTP_PROXY` / undici proxy dispatchers. No external CLI or hardware
+is required.
 
 > Verified against OpenClaw 2026.5.12. See [docs/DESIGN.md](../../docs/DESIGN.md).
 
@@ -30,30 +32,20 @@ openclaw gateway restart          # activate (you run this when ready)
 | `command:reset`      | `idle`           |
 | `command:stop`       | `idle`           |
 | `gateway:startup`    | `idle`           |
+| `gateway:shutdown`   | `offline`        |
+| `gateway:pre-restart` | `offline`        |
 
 Notes (verified against OpenClaw 2026.5.12):
-- There is no `gateway:shutdown` event, so `offline` is not emitted from OpenClaw.
+- `message:sent` maps to `error` when OpenClaw reports `context.success === false`;
+  otherwise it maps to `idle`.
 - OpenClaw has no "permission confirmation" event, so `confirm` is not triggered here.
 
 ## Configuration
 
-The hub endpoint defaults to `http://localhost:9527/state`. Override it with the
-`AGENTLIGHT_HUB` environment variable if the hub runs elsewhere:
-
-```json
-{
-  "hooks": {
-    "internal": {
-      "entries": {
-        "agentlight": {
-          "enabled": true,
-          "env": { "AGENTLIGHT_HUB": "http://localhost:9527/state" }
-        }
-      }
-    }
-  }
-}
-```
+The hub endpoint defaults to `http://127.0.0.1:9527/state`. Override it by setting
+`AGENTLIGHT_HUB` in the OpenClaw gateway process environment before the hook is loaded.
+OpenClaw hook entry `env` values are used for eligibility checks and should not be relied
+on to inject runtime environment variables into this handler.
 
 ## Requirements
 

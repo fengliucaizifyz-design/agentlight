@@ -13,7 +13,7 @@ agent events ──(translate)──► POST localhost:9527/state ──► hub 
 | Agent | Mechanism | Status |
 |---|---|---|
 | **Claude Code** | hooks in `settings.json` → `curl` | ✅ verified |
-| **OpenClaw** | internal hook handler (`handler.ts`) → `fetch` | ✅ verified |
+| **OpenClaw** | internal hook handler (`handler.ts`) → Node `http` POST | ✅ verified |
 | **Codex** | `[hooks]` or `notify` in `~/.codex/config.toml` → `curl` | 🔜 experimental (version-dependent) |
 
 ## Canonical states
@@ -55,7 +55,8 @@ Exact event names should be confirmed against your installed Codex version.
 
 ## OpenClaw (`adapters/openclaw/`)
 
-An internal hook handler (`handler.ts`) that `fetch`es the hub. See
+An internal hook handler (`handler.ts`) that POSTs to the hub with Node's `http` module,
+bypassing environment proxy settings for local `127.0.0.1` requests. See
 [adapters/openclaw/HOOK.md](../adapters/openclaw/HOOK.md) for the event mapping. OpenClaw
 has no permission-confirmation event, so `confirm` is not triggered there.
 
