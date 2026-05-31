@@ -4,7 +4,7 @@
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"idle\",\"source\":\"claude-code\"}'" }
+          { "type": "command", "command": "curl -s -m 1 --noproxy '*' -o /dev/null -X POST http://127.0.0.1:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"idle\",\"source\":\"claude-code\"}'" }
         ]
       }
     ],
@@ -12,7 +12,7 @@
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"working\",\"source\":\"claude-code\"}'" }
+          { "type": "command", "command": "curl -s -m 1 --noproxy '*' -o /dev/null -X POST http://127.0.0.1:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"working\",\"source\":\"claude-code\"}'" }
         ]
       }
     ],
@@ -20,7 +20,7 @@
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"working\",\"source\":\"claude-code\"}'" }
+          { "type": "command", "command": "curl -s -m 1 --noproxy '*' -o /dev/null -X POST http://127.0.0.1:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"working\",\"source\":\"claude-code\"}'" }
         ]
       }
     ],
@@ -28,7 +28,7 @@
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"working\",\"source\":\"claude-code\"}'" }
+          { "type": "command", "command": "curl -s -m 1 --noproxy '*' -o /dev/null -X POST http://127.0.0.1:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"working\",\"source\":\"claude-code\"}'" }
         ]
       }
     ],
@@ -36,7 +36,7 @@
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"confirm\",\"source\":\"claude-code\"}'" }
+          { "type": "command", "command": "curl -s -m 1 --noproxy '*' -o /dev/null -X POST http://127.0.0.1:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"confirm\",\"source\":\"claude-code\"}'" }
         ]
       }
     ],
@@ -44,7 +44,7 @@
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"idle\",\"source\":\"claude-code\"}'" }
+          { "type": "command", "command": "curl -s -m 1 --noproxy '*' -o /dev/null -X POST http://127.0.0.1:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"idle\",\"source\":\"claude-code\"}'" }
         ]
       }
     ],
@@ -52,7 +52,7 @@
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "curl -s -m 1 -o /dev/null -X POST http://localhost:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"offline\",\"source\":\"claude-code\"}'" }
+          { "type": "command", "command": "curl -s -m 1 --noproxy '*' -o /dev/null -X POST http://127.0.0.1:9527/state -H 'Content-Type: application/json' -d '{\"state\":\"offline\",\"source\":\"claude-code\"}'" }
         ]
       }
     ]
