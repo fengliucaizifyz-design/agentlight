@@ -67,8 +67,11 @@ After that, sending a message to the agent drives the light.
 Then tell the user: **restart Codex or open a new Codex session**. If Codex shows
 **"Hooks need review"**, choose **"Trust all and continue"**. Do **not** modify the existing
 `notify` setting; it may already be used by computer-use or another integration.
-Verify after a tool call with `curl -s http://localhost:9527/state` showing
-`"source":"codex"`.
+Verify with `~/.codex/hooks/agentlight-state.sh working`, then
+`curl -s http://localhost:9527/state` showing `"source":"codex"`. For Codex Desktop,
+also watch `~/.codex/hooks/agentlight.log` during a normal Desktop chat. If CLI/TUI logs
+hook events but Desktop does not, the Desktop app-server path is not executing these hooks
+on that machine; document that as a Desktop/app-server limitation rather than reinstalling.
 
 ## Step 3 — (Optional) the physical WiFi light
 
