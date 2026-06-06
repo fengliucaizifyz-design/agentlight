@@ -21,6 +21,9 @@ hub/AgentLight.app/Contents/MacOS/AgentLight
 # Ad-hoc code signature (regenerated on build/sign)
 hub/AgentLight.app/Contents/_CodeSignature/
 
+# Release artifacts (uploaded to GitHub Releases, not committed)
+dist/
+
 # Settings backups created by adapter installers
 *.agentlight.bak
 
