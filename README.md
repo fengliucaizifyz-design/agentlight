@@ -54,7 +54,19 @@ are not routed through `HTTP_PROXY` / undici proxy settings.
 
 ## Install
 
-### 1. Build & run the hub
+### 1. Get & run the hub
+
+**No compiler (prebuilt, recommended):** download the signed hub from the latest
+[release](https://github.com/fengliucaizifyz-design/agentlight/releases/latest), install it
+to run at login, and wire up Claude Code — no Xcode needed:
+
+```bash
+git clone https://github.com/fengliucaizifyz-design/agentlight.git
+cd agentlight
+./scripts/install-release.sh
+```
+
+**Build from source** (needs macOS + Xcode Command Line Tools / `swiftc`):
 
 ```bash
 git clone https://github.com/fengliucaizifyz-design/agentlight.git
@@ -63,8 +75,12 @@ cd agentlight/hub
 open AgentLight.app
 ```
 
-It lives in the menu bar (no Dock icon). Requires macOS + Xcode Command Line Tools
-(`swiftc`). The built binary has zero third-party dependencies.
+Either way it lives in the menu bar (no Dock icon) and has zero third-party dependencies.
+
+> The prebuilt app is **ad-hoc signed, not notarized** (this is a free OSS project with no
+> Apple Developer ID). `install-release.sh` clears the download quarantine for you. If you
+> ever launch it by hand, the first launch may need a right-click → **Open**, or:
+> `xattr -dr com.apple.quarantine AgentLight.app`.
 
 ### 2. Connect Claude Code
 
@@ -125,7 +141,11 @@ agentlight/
 │   ├── DESIGN.md                # architecture & decisions
 │   ├── hardware.md              # WLED light: what to buy
 │   └── cross-platform.md        # how the adapters map events → states
-├── scripts/install.sh           # convenience installer (build hub + Claude Code)
+├── scripts/
+│   ├── install.sh               # installer: source build, else prebuilt fallback
+│   ├── install-release.sh       # installer: prebuilt signed hub (no compiler)
+│   ├── install-autostart.sh     # register the login LaunchAgent
+│   └── package-release.sh       # maintainer: build universal + sign + zip
 ├── SKILL.md                     # OpenClaw ClawHub skill descriptor
 └── LICENSE                      # MIT-0
 ```

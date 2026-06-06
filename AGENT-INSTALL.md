@@ -32,12 +32,20 @@ auto-start (the auto-start step also makes the menu-bar light appear reliably):
 git clone https://github.com/fengliucaizifyz-design/agentlight ~/agentlight 2>/dev/null || \
   (cd ~/agentlight && git pull)
 
-# 2. Build + sign + auto-start at login (also starts it now)
-~/agentlight/scripts/install-autostart.sh
+# 2a. PREFERRED — no compiler needed: download the prebuilt signed hub, then
+#     auto-start it at login (also clears the download quarantine for you).
+~/agentlight/scripts/install-release.sh
+
+# 2b. OR build from source (only if you have swiftc / Xcode Command Line Tools):
+# ~/agentlight/scripts/install-autostart.sh
 ```
 
-- If `swiftc` is missing, tell the user to run `xcode-select --install` (they must click
-  "Install" in the dialog), then retry.
+- Prefer **2a** (the prebuilt path) — it needs no compiler. Use **2b** only when `swiftc`
+  is already available.
+- If you go the source route and `swiftc` is missing, either switch to **2a** or tell the
+  user to run `xcode-select --install` (they must click "Install" in the dialog), then retry.
+- The prebuilt hub is ad-hoc signed, not notarized; `install-release.sh` already clears the
+  quarantine, so no Gatekeeper prompt should appear.
 - Verify the hub is up: `curl -s http://localhost:9527/state` should return JSON.
 - Tell the user they should now see a small dot in the menu bar (their menu bar may be busy;
   it's the colored dot near the right-side icons).
