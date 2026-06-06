@@ -56,14 +56,15 @@ are not routed through `HTTP_PROXY` / undici proxy settings.
 
 ### 1. Get & run the hub
 
-**No compiler (prebuilt, recommended):** download the signed hub from the latest
-[release](https://github.com/fengliucaizifyz-design/agentlight/releases/latest), install it
-to run at login, and wire up Claude Code — no Xcode needed:
+**No compiler (prebuilt, recommended):** download the signed, agent-agnostic hub from the
+latest [release](https://github.com/fengliucaizifyz-design/agentlight/releases/latest) and
+install it to run at login — no Xcode needed:
 
 ```bash
 git clone https://github.com/fengliucaizifyz-design/agentlight.git
 cd agentlight
-./scripts/install-release.sh
+./scripts/install-release.sh                # hub only — prints the adapter commands
+# or wire an agent in one go:  ./scripts/install-release.sh claude-code | codex | openclaw
 ```
 
 **Build from source** (needs macOS + Xcode Command Line Tools / `swiftc`):
@@ -82,15 +83,26 @@ Either way it lives in the menu bar (no Dock icon) and has zero third-party depe
 > ever launch it by hand, the first launch may need a right-click → **Open**, or:
 > `xattr -dr com.apple.quarantine AgentLight.app`.
 
-### 2. Connect Claude Code
+### 2. Connect your agent
+
+The hub treats all agents equally — install the adapter for whichever one(s) you use:
 
 ```bash
-cd agentlight/adapters/claude-code
-./install.sh                 # merges hooks into ~/.claude/settings.json (needs jq)
-# or target a project:  ./install.sh /path/to/project/.claude/settings.json
+# Claude Code
+./adapters/claude-code/install.sh     # merges hooks into ~/.claude/settings.json (needs jq)
+# → then open a new Claude Code session
+
+# OpenClaw
+./adapters/openclaw/install.sh        # installs + enables the hook
+# → then: openclaw gateway restart
+
+# Codex (experimental)
+./adapters/codex/install.sh           # appends hooks to ~/.codex/config.toml
+# → then restart Codex and choose "Trust all and continue" if prompted
 ```
 
-Start a Claude Code session — the menu-bar light now tracks it live.
+The matching menu-bar light now tracks that agent live. (You can install more than one — the
+color means the same thing across all of them.)
 
 ### 3. (Optional) Connect a physical WiFi light
 
