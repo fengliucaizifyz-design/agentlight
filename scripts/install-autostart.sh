@@ -30,10 +30,25 @@ if [ "$1" = "--uninstall" ]; then
     exit 0
 fi
 
-# Build the hub if it isn't built yet.
-if [ ! -x "$BIN" ]; then
-    info "Building the hub…"
-    ( cd "$REPO_DIR/hub" && ./build.sh )
+# Stop any running hub BEFORE building, so the binary isn't busy. Building over a
+# running executable can fail silently (the process holds the file), and stopping
+# first is also what lets an update actually replace the old process.
+launchctl bootout "$GUI/$LABEL" 2>/dev/null || true
+
+# Build (or rebuild) the hub. Rebuild when main.swift is newer than the built
+# binary — so `git pull` + re-run picks up the new code, not just when the binary
+# is missing. When swiftc is unavailable we rely on a prebuilt binary already
+# being in place (the install-release.sh path), so only fail if there's nothing
+# to run at all.
+if command -v swiftc >/dev/null 2>&1; then
+    if [ ! -x "$BIN" ] || [ "$REPO_DIR/hub/main.swift" -nt "$BIN" ]; then
+        info "Building the hub…"
+        ( cd "$REPO_DIR/hub" && ./build.sh )
+    fi
+elif [ ! -x "$BIN" ]; then
+    warn "No prebuilt hub found and swiftc is unavailable — cannot build."
+    warn "Install Xcode Command Line Tools, or run ./scripts/install-release.sh"
+    exit 1
 fi
 
 # Ad-hoc sign + clear quarantine so macOS launches it without a Gatekeeper block.

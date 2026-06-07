@@ -41,6 +41,12 @@ if ! command -v swiftc >/dev/null 2>&1; then
     warn "swiftc not found — using the prebuilt, signed hub from the latest release."
     exec "$REPO_DIR/scripts/install-release.sh" "$@"
 fi
+# Stop any running hub (a login LaunchAgent or a previously-opened copy) before
+# building, so we don't build over a busy binary and so the rebuilt hub actually
+# replaces the old process instead of `open` just re-foregrounding the old one.
+launchctl bootout "gui/$(id -u)/ai.agentlight.hub" 2>/dev/null || true
+killall AgentLight 2>/dev/null || true
+
 info "Building the hub…"
 ( cd "$REPO_DIR/hub" && ./build.sh )
 

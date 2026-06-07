@@ -85,6 +85,11 @@ Either way it lives in the menu bar (no Dock icon) and has zero third-party depe
 > ever launch it by hand, the first launch may need a right-click → **Open**, or:
 > `xattr -dr com.apple.quarantine AgentLight.app`.
 
+**Updating:** after `git pull`, re-run `./scripts/install-autostart.sh` — it rebuilds when the
+source changed and restarts the running hub, so the new code actually takes effect. (Building
+from source? use the same command to update; `./scripts/install.sh` / `build.sh` + `open` is
+the one-off "build and look at it" path and does not touch the login auto-start.)
+
 ### 2. Connect your agent
 
 The hub treats all agents equally — install the adapter for whichever one(s) you use:
