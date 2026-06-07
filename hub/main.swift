@@ -91,6 +91,16 @@ struct AppConfig {
 // MARK: - WLED output
 
 enum WLED {
+    /// A URLSession that ignores the system HTTP/HTTPS proxy. The physical light
+    /// is on the LAN; routing its requests through a proxy (Clash/Surge/etc.)
+    /// breaks them. Mirrors the adapters' local-post proxy bypass.
+    private static let session: URLSession = {
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.connectionProxyDictionary = [:]   // empty -> no proxy, direct LAN
+        cfg.timeoutIntervalForRequest = 2
+        return URLSession(configuration: cfg)
+    }()
+
     /// Push a solid color to a WLED device over the LAN. Failures are non-fatal.
     static func push(ip: String, rgb: (Int, Int, Int)) {
         guard let url = URL(string: "http://\(ip)/json/state") else { return }
@@ -106,7 +116,7 @@ enum WLED {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = data
         req.timeoutInterval = 2
-        URLSession.shared.dataTask(with: req) { _, _, err in
+        session.dataTask(with: req) { _, _, err in
             if let err = err { log("WLED push failed: \(err.localizedDescription)") }
         }.resume()
     }
