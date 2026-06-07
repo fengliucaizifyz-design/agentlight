@@ -134,6 +134,7 @@ final class Discovery {
     private let queue = DispatchQueue(label: "agentlight.discovery")
     private var browser: NWBrowser?
     private var resolving = false
+    private var generation = 0   // bumped per resolve; guards stale callbacks
 
     private let lock = NSLock()
     private var _ip: String?
@@ -183,10 +184,23 @@ final class Discovery {
         // callback raced so badly that none ever reached .ready → IP stuck nil.)
         if resolving { return }
         resolving = true
+        // Generation token: only THIS attempt's callbacks may release the guard.
+        // Without it, a previous attempt's late .cancelled handler or 5s safety
+        // timer could clear `resolving` while a newer attempt is in flight,
+        // defeating the "one at a time" protection. (All on the serial queue, so
+        // a plain Int is fine.)
+        generation += 1
+        let gen = generation
         let params = NWParameters.tcp
         (params.defaultProtocolStack.internetProtocol as? NWProtocolIP.Options)?.version = .v4
         let conn = NWConnection(to: endpoint, using: params)
-        let finish: () -> Void = { [weak self] in conn.cancel(); self?.resolving = false }
+        // Always cancel this attempt's own connection; only the current
+        // generation may flip the shared `resolving` flag back off.
+        let finish: () -> Void = { [weak self] in
+            conn.cancel()
+            guard let self = self, gen == self.generation else { return }
+            self.resolving = false
+        }
         conn.stateUpdateHandler = { [weak self, weak conn] state in
             guard let self = self, let conn = conn else { return }
             switch state {
@@ -204,8 +218,13 @@ final class Discovery {
             }
         }
         conn.start(queue: queue)
-        // Safety: never let `resolving` stick if the connection hangs preparing.
-        queue.asyncAfter(deadline: .now() + 5) { if self.resolving { finish() } }
+        // Safety: release the guard if this attempt hangs preparing — but only if
+        // it's still the current generation (else a stale timer would clobber a
+        // newer in-flight resolve).
+        queue.asyncAfter(deadline: .now() + 5) { [weak self] in
+            guard let self = self, gen == self.generation, self.resolving else { return }
+            finish()
+        }
     }
 }
 

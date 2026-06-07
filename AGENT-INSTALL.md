@@ -81,17 +81,20 @@ also watch `~/.codex/hooks/agentlight.log` during a normal Desktop chat. If CLI/
 hook events but Desktop does not, the Desktop app-server path is not executing these hooks
 on that machine; document that as a Desktop/app-server limitation rather than reinstalling.
 
-## Step 3 — (Optional) the physical WiFi light
+## Step 3 — (Optional) the physical light
 
-Only if the user says they have the AgentLight WiFi light:
+Only if the user has a light. Two cases:
 
-1. Make sure it's joined to the user's 2.4 GHz WiFi (one-time phone onboarding, like any
-   smart light).
-2. In the AgentLight menu-bar menu, choose **"Set Physical Light (WLED) IP…"** and enter
-   **`agentlight.local`** (or its LAN IP).
+- **AgentLight screen (Pro Max):** nothing to type. Power it and onboard its WiFi (its
+  on-screen guide walks the user through joining the `AgentLight-XXXX` hotspot from a phone,
+  2.4 GHz). The hub **auto-discovers** it on the LAN (Bonjour `_agentlight._tcp`) — leave
+  "Set Physical Light IP" **empty**; the menu shows `Light: <ip> (auto)` once found.
+- **A generic WLED light:** in the menu choose **"Set Physical Light (WLED) IP…"** and enter
+  its **LAN IP** (e.g. `192.168.1.42`). Do **not** enter `agentlight.local` — macOS times out
+  resolving `.local` names in a URL, so the push would fail.
 
-The hub then mirrors every color to the physical light. If the user has no light, skip this —
-the menu-bar light works on its own.
+The hub then mirrors every color to the light. No light? Skip this — the menu-bar light works
+on its own.
 
 ---
 
