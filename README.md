@@ -11,9 +11,11 @@ idle, working, waiting for your confirmation, or errored.
 Works with **Claude Code**, **Codex**, and **OpenClaw** — they all report into one small
 local hub, so the color means the same thing no matter which agent you're running.
 
-> **Status:** the hub + menu-bar light + the **Claude Code** and **OpenClaw** adapters are
-> verified. The Codex adapter is an experimental draft (depends on your Codex version).
-> WLED physical-light output is built in and activates once you point it at a light.
+> **Status:** the hub + menu-bar light and all three adapters (**Claude Code**, **OpenClaw**,
+> **Codex**) are verified. Codex is verified on the **CLI/TUI**; **Codex Desktop** has a known
+> limitation — on some machines its app-server doesn't run the hooks (see
+> [AGENT-INSTALL.md](AGENT-INSTALL.md)). WLED physical-light output is built in and activates
+> once you point it at a light.
 
 ## Easiest install: let your agent do it
 
@@ -96,7 +98,7 @@ The hub treats all agents equally — install the adapter for whichever one(s) y
 ./adapters/openclaw/install.sh        # installs + enables the hook
 # → then: openclaw gateway restart
 
-# Codex (experimental)
+# Codex (CLI/TUI verified; Codex Desktop: see AGENT-INSTALL.md note)
 ./adapters/codex/install.sh           # appends hooks to ~/.codex/config.toml
 # → then restart Codex and choose "Trust all and continue" if prompted
 ```
@@ -145,7 +147,7 @@ agentlight/
 │   └── AgentLight.app/
 ├── adapters/                    # one input adapter per agent
 │   ├── claude-code/             # ✅ verified — hooks snippet + installer
-│   ├── codex/                   # 🔜 experimental draft (version-dependent)
+│   ├── codex/                   # ✅ verified (CLI/TUI) — Codex Desktop app-server caveat
 │   └── openclaw/                # ✅ verified — hook handler + installer
 ├── examples/
 │   └── demo.html                # browser demo (polls the hub)
