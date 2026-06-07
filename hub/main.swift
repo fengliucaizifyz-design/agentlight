@@ -133,7 +133,7 @@ final class Discovery {
 
     private let queue = DispatchQueue(label: "agentlight.discovery")
     private var browser: NWBrowser?
-    private var resolvers: [NWConnection] = []
+    private var resolving = false
 
     private let lock = NSLock()
     private var _ip: String?
@@ -179,29 +179,33 @@ final class Discovery {
     /// Resolve a Bonjour endpoint to an IPv4 by opening a short-lived connection
     /// and reading the resolved remote endpoint.
     private func resolve(_ endpoint: NWEndpoint) {
-        resolvers.forEach { $0.cancel() }
-        resolvers.removeAll()
+        // One resolve at a time. (Cancelling an in-flight resolve on every browse
+        // callback raced so badly that none ever reached .ready → IP stuck nil.)
+        if resolving { return }
+        resolving = true
         let params = NWParameters.tcp
         (params.defaultProtocolStack.internetProtocol as? NWProtocolIP.Options)?.version = .v4
         let conn = NWConnection(to: endpoint, using: params)
+        let finish: () -> Void = { [weak self] in conn.cancel(); self?.resolving = false }
         conn.stateUpdateHandler = { [weak self, weak conn] state in
-            guard let conn = conn else { return }
+            guard let self = self, let conn = conn else { return }
             switch state {
             case .ready:
                 if let remote = conn.currentPath?.remoteEndpoint,
                    case let .hostPort(host, _) = remote,
                    case let .ipv4(addr) = host {
-                    self?.setIP(addr.rawValue.map(String.init).joined(separator: "."))
+                    self.setIP(addr.rawValue.map(String.init).joined(separator: "."))
                 }
-                conn.cancel()
+                finish()
             case .failed, .cancelled:
-                conn.cancel()
+                finish()
             default:
                 break
             }
         }
         conn.start(queue: queue)
-        resolvers.append(conn)
+        // Safety: never let `resolving` stick if the connection hangs preparing.
+        queue.asyncAfter(deadline: .now() + 5) { if self.resolving { finish() } }
     }
 }
 
@@ -253,6 +257,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async { self?.render(); self?.pushCurrent() }
         }
         Discovery.shared.start()
+
+        // Heartbeat: re-assert the current color every few seconds so the screen
+        // self-heals from a dropped push or a screen reboot (eventual consistency).
+        Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+            self?.pushCurrent()
+        }
     }
 
     func apply(state: String, source: String?, detail: String?) {
