@@ -14,9 +14,10 @@
  * So in the hub menu you just set "Physical Light (WLED) IP" = agentlight.local
  * and the screen tracks your agent — no hub code changes.
  *
- * WiFi: provisioned via a phone (captive portal), never hard-coded. Credentials
- * are stored on-device; if they stop working (e.g. you moved to a new office),
- * the screen re-opens the setup hotspot automatically.
+ * WiFi: provisioned over USB serial by the user's AI agent during setup (the
+ * agent writes the creds; see docs/promax-onboarding.md). Credentials persist
+ * on-device, so it reconnects on its own afterwards — runs wireless on battery.
+ * The device self-announces on serial so the agent can find it.
  *
  * Faces/animation are intentionally OUT OF SCOPE for now — solid colour aligns
  * with the project's existing state→colour model and is trivial to extend later.
@@ -25,7 +26,6 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
-#include <WiFiManager.h>     // tzapu/WiFiManager — captive-portal provisioning
 #include <WebServer.h>
 #include <ESPmDNS.h>
 #include <ArduinoJson.h>     // v7
@@ -43,6 +43,19 @@ WebServer server(HTTP_PORT);
 // Last colour the hub asked for (kept so we can redraw / breathe later).
 uint8_t curR = 0, curG = 0, curB = 0, curBri = 255;
 bool    curOn = false;
+
+// Lifecycle / serial state.
+bool          servicesStarted = false;   // mDNS + HTTP server started once
+bool          wasConnected = false;      // edge-detect WiFi connect/drop
+unsigned long lastBanner = 0;            // self-announce throttle
+String        serialLine;                // accumulates one serial command line
+
+// 4-hex device id from the MAC, e.g. "9CF5".
+String deviceId() {
+  char buf[8];
+  snprintf(buf, sizeof(buf), "%04X", (uint16_t)(ESP.getEfuseMac() & 0xFFFF));
+  return String(buf);
+}
 
 // ---- helpers ---------------------------------------------------------------
 
@@ -70,22 +83,29 @@ void zhLine(const uint8_t* bmp, int w, int h, int y, uint16_t color) {
   tft.drawBitmap((240 - w) / 2, y, bmp, w, h, color);
 }
 
-// Setup-mode screen, shown whenever the captive portal is open.
-// Chinese lines are bitmaps; the SSID stays ASCII (built-in font).
+// Setup-mode screen (shown until WiFi is provisioned). Slice 1 keeps it a plain
+// placeholder; slice 2 replaces it with the polished Chinese phrase screen
+// ("跟你的 AI 助手说:读取并设置我刚插上的 USB 设备") via the bitmap pipeline.
 void drawSetupScreen() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
-
   tft.setTextColor(TFT_CYAN, TFT_BLACK);
-  tft.drawString("AgentLight", 120, 22, 4);             // ASCII title
-  zhLine(zh_sub,   ZH_SUB_W,   ZH_SUB_H,   48, TFT_WHITE);   // 配网设置
+  tft.drawString("AgentLight", 120, 78, 4);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.drawString("setup mode", 120, 108, 2);
+  tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  tft.drawString("tell your AI agent to", 120, 138, 2);
+  tft.drawString("read & set up this USB device", 120, 158, 1);
+}
 
-  zhLine(zh_step1, ZH_STEP1_W, ZH_STEP1_H, 86, TFT_GREEN);   // 1. 连接下方热点
-  tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-  tft.drawString(apName(), 120, 124, 4);                // AgentLight-XXXX (ASCII)
-
-  zhLine(zh_step2, ZH_STEP2_W, ZH_STEP2_H, 150, TFT_WHITE);  // 2. 打开弹出页面
-  zhLine(zh_step3, ZH_STEP3_W, ZH_STEP3_H, 182, TFT_WHITE);  // 3. 输入网络密码
+// Shown while joining WiFi after the agent sends credentials.
+void drawConnectingScreen(const char* ssid) {
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.drawString("Connecting...", 120, 110, 4);
+  tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  tft.drawString(ssid, 120, 140, 2);
 }
 
 // Connected-but-idle screen, until the hub pushes the first colour.
@@ -142,11 +162,75 @@ void handleRoot() {
 
 // ---- lifecycle -------------------------------------------------------------
 
-void startPortalBlocking() {
-  WiFiManager wm;
-  wm.setAPCallback([](WiFiManager*) { drawSetupScreen(); });
-  wm.setConfigPortalTimeout(0);            // stay open until configured
-  wm.autoConnect(apName().c_str());        // blocks; opens portal if needed
+// Start mDNS + HTTP server once, after WiFi first connects.
+void startServices() {
+  if (servicesStarted) return;
+  if (MDNS.begin(MDNS_HOST)) {
+    MDNS.addService("http", "tcp", HTTP_PORT);
+    // Custom service so the hub browses for AgentLight screens specifically.
+    MDNS.addService("agentlight", "tcp", HTTP_PORT);
+    MDNS.addServiceTxt("agentlight", "tcp", "id", deviceId());
+  }
+  server.on("/json/state", HTTP_POST, handleSetState);
+  server.on("/json/state", HTTP_GET,  handleGetState);
+  server.on("/",           HTTP_GET,  handleRoot);
+  server.begin();
+  servicesStarted = true;
+}
+
+// Self-announce on serial so the agent can find + identify this device among
+// any other USB serial ports. One line, ~every 2s.
+void emitBanner() {
+  bool up = (WiFi.status() == WL_CONNECTED);
+  Serial.printf("AGENTLIGHT id=%s proto=1 wifi=%s ip=%s\n",
+                deviceId().c_str(), up ? "connected" : "setup",
+                up ? WiFi.localIP().toString().c_str() : "0.0.0.0");
+}
+
+// Handle one JSON command line from the agent (over USB serial).
+//   {"cmd":"id"}                          -> {"id","proto","wifi","ip"}
+//   {"cmd":"wifi","ssid":..,"pass":..}    -> {"ok":true,"ip":..} / {"ok":false,"error":..}
+void processCommand(const String& line) {
+  JsonDocument doc;
+  if (deserializeJson(doc, line)) return;          // ignore non-JSON noise
+  const char* cmd = doc["cmd"] | "";
+
+  if (!strcmp(cmd, "id")) {
+    Serial.printf("{\"id\":\"%s\",\"proto\":1,\"wifi\":\"%s\",\"ip\":\"%s\"}\n",
+                  deviceId().c_str(),
+                  WiFi.status() == WL_CONNECTED ? "connected" : "disconnected",
+                  WiFi.localIP().toString().c_str());
+    return;
+  }
+
+  if (!strcmp(cmd, "wifi")) {
+    const char* ssid = doc["ssid"] | "";
+    const char* pass = doc["pass"] | "";
+    if (!*ssid) { Serial.println("{\"ok\":false,\"error\":\"no ssid\"}"); return; }
+    drawConnectingScreen(ssid);
+    WiFi.persistent(true);                 // save creds so it reconnects on its own
+    WiFi.begin(ssid, pass);
+    unsigned long t0 = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - t0 < 20000) delay(200);
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.printf("{\"ok\":true,\"ip\":\"%s\"}\n", WiFi.localIP().toString().c_str());
+    } else {
+      Serial.println("{\"ok\":false,\"error\":\"connect timeout\"}");
+    }
+    return;
+  }
+}
+
+// Read serial byte-by-byte, dispatch on each complete line.
+void handleSerial() {
+  while (Serial.available()) {
+    char c = (char)Serial.read();
+    if (c == '\n' || c == '\r') {
+      if (serialLine.length()) { processCommand(serialLine); serialLine = ""; }
+    } else if (serialLine.length() < 300) {
+      serialLine += c;
+    }
+  }
 }
 
 void setup() {
@@ -159,43 +243,28 @@ void setup() {
 
   tft.init();
   tft.setRotation(0);   // TUNE: 0/1/2/3 if the image is rotated or mirrored
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextDatum(MC_DATUM);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.drawString("AgentLight", 120, 108, 4);
-  tft.drawString("booting...", 120, 138, 2);
+  drawSetupScreen();
 
-  startPortalBlocking();                   // -> Wi-Fi connected after this
-
-  if (MDNS.begin(MDNS_HOST)) {
-    MDNS.addService("http", "tcp", HTTP_PORT);
-    // Custom service so the hub can browse for AgentLight screens specifically
-    // (not every _http._tcp device) and auto-discover this one.
-    MDNS.addService("agentlight", "tcp", HTTP_PORT);
-    MDNS.addServiceTxt("agentlight", "tcp", "id", apName());
-  }
-  server.on("/json/state", HTTP_POST, handleSetState);
-  server.on("/json/state", HTTP_GET,  handleGetState);
-  server.on("/",           HTTP_GET,  handleRoot);
-  server.begin();
-
-  drawWaitingScreen();
+  // Non-blocking: reconnect to stored creds (if any). loop() keeps running so
+  // serial provisioning works even when there are no creds yet.
+  WiFi.mode(WIFI_STA);
+  WiFi.begin();
 }
 
 void loop() {
-  server.handleClient();
+  handleSerial();
 
-  // Mobile-office watchdog: if Wi-Fi is down for a while (moved location),
-  // reopen the setup hotspot, then restart cleanly once reconfigured.
-  static unsigned long downSince = 0;
-  if (WiFi.status() != WL_CONNECTED) {
-    if (downSince == 0) {
-      downSince = millis();
-    } else if (millis() - downSince > 30000) {
-      startPortalBlocking();
-      ESP.restart();
-    }
-  } else {
-    downSince = 0;
+  if (millis() - lastBanner > 2000) { lastBanner = millis(); emitBanner(); }
+
+  bool connected = (WiFi.status() == WL_CONNECTED);
+  if (connected && !wasConnected) {          // just came online
+    wasConnected = true;
+    startServices();
+    drawWaitingScreen();
+  } else if (!connected && wasConnected) {   // dropped
+    wasConnected = false;
+    drawSetupScreen();
   }
+
+  if (servicesStarted) server.handleClient();
 }
