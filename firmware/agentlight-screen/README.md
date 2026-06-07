@@ -82,26 +82,25 @@ uvx --with pillow python3 tools/gen_zh_assets.py    # rewrites zh_assets.h
 
 ## Connect it to the hub
 
-1. Find the screen's LAN IP (it advertises mDNS as `agentlight.local`; resolve it with
-   `dns-sd -G v4 agentlight.local`).
-2. In the AgentLight menu bar → **"Set Physical Light (WLED) IP…"** → enter that **IP**.
+**Nothing to configure.** The firmware advertises a Bonjour service
+(`_agentlight._tcp`); the hub **auto-discovers the screen** (NWBrowser → resolves to IPv4)
+and pushes colour to it. Leave the hub's "Physical Light IP" empty (auto). The menu shows
+`Light: <ip> (auto)` once found. A manually-entered IP still overrides if you need it.
 
-Now the screen colour follows your agent live.
+Auto-discovery also handles a **WiFi switch**: the hub re-resolves the new IP on its own —
+no re-entry. (Why not `agentlight.local` in a URL? macOS getaddrinfo on `.local` times out;
+Bonjour *browsing* via NWBrowser is the reliable path.)
 
 ```bash
-# Manual sanity check (amber). Use the IP; add --noproxy if you run a local proxy:
+# Manual sanity check (amber). Resolve the IP, then POST (--noproxy if you run a proxy):
+IP=$(dns-sd -G v4 agentlight.local 2>/dev/null & sleep 2; kill %1 2>/dev/null)  # or read it off the menu
 curl --noproxy '*' -s -X POST http://<screen-ip>/json/state \
   -H 'Content-Type: application/json' \
   -d '{"on":true,"bri":200,"seg":[{"col":[[255,180,0]]}]}'
 ```
 
-> **Use the IP, not `agentlight.local`, for now.** macOS's resolver (and URLSession) often
-> times out on `.local` mDNS names, so the hub's pushes to `agentlight.local` fail
-> intermittently. The raw IP is reliable. Making mDNS robust (or resolving it inside the hub)
-> is a product-stage TODO.
->
-> If you run a LAN proxy (Clash/Surge), the hub bypasses it for the light push — the WLED
-> output uses a proxy-free `URLSession`. Plain `curl` needs `--noproxy '*'`.
+> If you run a LAN proxy (Clash/Surge), the hub bypasses it for the light push (proxy-free
+> `URLSession`). Plain `curl` needs `--noproxy '*'`.
 
 ## Tuning (first flash often needs one of these)
 
