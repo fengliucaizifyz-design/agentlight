@@ -169,6 +169,10 @@ void setup() {
 
   if (MDNS.begin(MDNS_HOST)) {
     MDNS.addService("http", "tcp", HTTP_PORT);
+    // Custom service so the hub can browse for AgentLight screens specifically
+    // (not every _http._tcp device) and auto-discover this one.
+    MDNS.addService("agentlight", "tcp", HTTP_PORT);
+    MDNS.addServiceTxt("agentlight", "tcp", "id", apName());
   }
   server.on("/json/state", HTTP_POST, handleSetState);
   server.on("/json/state", HTTP_GET,  handleGetState);

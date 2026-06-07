@@ -122,6 +122,89 @@ enum WLED {
     }
 }
 
+// MARK: - mDNS discovery (auto-find the screen)
+
+/// Browses for the screen's Bonjour service (`_agentlight._tcp`) and resolves it
+/// to a concrete IPv4. Using NWBrowser is reliable, unlike putting `.local` in a
+/// URL (macOS getaddrinfo on mDNS names times out). Re-browses on network change,
+/// so a WiFi switch / new IP is picked up automatically — no manual re-entry.
+final class Discovery {
+    static let shared = Discovery()
+
+    private let queue = DispatchQueue(label: "agentlight.discovery")
+    private var browser: NWBrowser?
+    private var resolvers: [NWConnection] = []
+
+    private let lock = NSLock()
+    private var _ip: String?
+    /// Latest auto-discovered screen IPv4, or nil if none found yet.
+    var currentIP: String? { lock.lock(); defer { lock.unlock() }; return _ip }
+
+    /// Called (on an arbitrary queue) when the discovered IP changes.
+    var onChange: (() -> Void)?
+
+    private func setIP(_ ip: String?) {
+        lock.lock(); let changed = (_ip != ip); _ip = ip; lock.unlock()
+        if changed {
+            log("discovery: screen at \(ip ?? "(none)")")
+            onChange?()
+        }
+    }
+
+    func start() { startBrowser() }
+
+    private func startBrowser() {
+        browser?.cancel()
+        let b = NWBrowser(for: .bonjour(type: "_agentlight._tcp", domain: nil), using: .tcp)
+        // NWBrowser is network-aware: it re-queries after a WiFi/interface change
+        // and updates results on its own, so we do NOT restart on path churn
+        // (doing that thrashed the IP under a VPN/proxy). Only restart on failure.
+        b.stateUpdateHandler = { [weak self] state in
+            guard let self = self else { return }
+            if case .failed = state {
+                self.queue.asyncAfter(deadline: .now() + 2) { self.startBrowser() }
+            }
+        }
+        b.browseResultsChangedHandler = { [weak self] results, _ in
+            guard let self = self else { return }
+            // Latch the last good IP; do NOT clear on a transient empty result set
+            // (that caused flapping). A new/changed service re-resolves and updates
+            // the IP — including the new IP after a WiFi switch.
+            if let first = results.first { self.resolve(first.endpoint) }
+        }
+        b.start(queue: queue)
+        browser = b
+    }
+
+    /// Resolve a Bonjour endpoint to an IPv4 by opening a short-lived connection
+    /// and reading the resolved remote endpoint.
+    private func resolve(_ endpoint: NWEndpoint) {
+        resolvers.forEach { $0.cancel() }
+        resolvers.removeAll()
+        let params = NWParameters.tcp
+        (params.defaultProtocolStack.internetProtocol as? NWProtocolIP.Options)?.version = .v4
+        let conn = NWConnection(to: endpoint, using: params)
+        conn.stateUpdateHandler = { [weak self, weak conn] state in
+            guard let conn = conn else { return }
+            switch state {
+            case .ready:
+                if let remote = conn.currentPath?.remoteEndpoint,
+                   case let .hostPort(host, _) = remote,
+                   case let .ipv4(addr) = host {
+                    self?.setIP(addr.rawValue.map(String.init).joined(separator: "."))
+                }
+                conn.cancel()
+            case .failed, .cancelled:
+                conn.cancel()
+            default:
+                break
+            }
+        }
+        conn.start(queue: queue)
+        resolvers.append(conn)
+    }
+}
+
 // MARK: - App Delegate (menu bar)
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -145,9 +228,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Set Physical Light (WLED) IP…",
                                 action: #selector(setWledIP), keyEquivalent: ""))
-        let wledStatus = NSMenuItem(
-            title: config.wledIP.map { "WLED: \($0)" } ?? "WLED: not set",
-            action: nil, keyEquivalent: "")
+        let wledStatus = NSMenuItem(title: "Light: …", action: nil, keyEquivalent: "")
         wledStatus.tag = 99
         menu.addItem(wledStatus)
         menu.addItem(.separator())
@@ -165,6 +246,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         HTTPServer.shared.start()
         log("AgentLight started on port \(PORT)")
+
+        // Auto-discover the physical screen; re-render + (re)push when it appears
+        // or its IP changes (e.g. after a WiFi switch).
+        Discovery.shared.onChange = { [weak self] in
+            DispatchQueue.main.async { self?.render(); self?.pushCurrent() }
+        }
+        Discovery.shared.start()
     }
 
     func apply(state: String, source: String?, detail: String?) {
@@ -173,10 +261,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         currentSource = source
         currentDetail = detail
         render()
-        if let ip = config.wledIP, let style = STATES[state] {
-            WLED.push(ip: ip, rgb: style.rgb)
-        }
+        pushCurrent()
         log("state → \(displayName(forSource: source)) \(state)\(detail.map { " (\($0))" } ?? "")")
+    }
+
+    /// Push the current state's color to the light. A manually-set IP wins;
+    /// otherwise the auto-discovered screen IP is used.
+    func pushCurrent() {
+        guard let ip = config.wledIP ?? Discovery.shared.currentIP,
+              let style = STATES[currentState] else { return }
+        WLED.push(ip: ip, rgb: style.rgb)
     }
 
     func render() {
@@ -189,6 +283,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let d = currentDetail, !d.isEmpty { full += " — \(d)" }
         statusItem.button?.toolTip = full
         statusItem.menu?.item(withTag: 88)?.title = full
+
+        // Light status: manual IP wins, else auto-discovered, else searching.
+        if let item = statusItem.menu?.item(withTag: 99) {
+            if let manual = config.wledIP {
+                item.title = "Light: \(manual) (manual)"
+            } else if let auto = Discovery.shared.currentIP {
+                item.title = "Light: \(auto) (auto)"
+            } else {
+                item.title = "Light: searching…"
+            }
+        }
     }
 
     @objc func setWledIP() {
@@ -205,10 +310,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let ip = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             config.wledIP = ip.isEmpty ? nil : ip
             config.save()
-            if let item = statusItem.menu?.item(withTag: 99) {
-                item.title = config.wledIP.map { "WLED: \($0)" } ?? "WLED: not set"
-            }
-            log("WLED IP set to \(config.wledIP ?? "(none)")")
+            render()
+            pushCurrent()
+            log("WLED IP set to \(config.wledIP ?? "(auto-discover)")")
         }
     }
 
