@@ -19,11 +19,17 @@ OUT = os.path.join(os.path.dirname(__file__), "..", "zh_assets.h")
 
 # name -> text. Names become ZH_<NAME>_{W,H} and zh_<name> arrays.
 LINES = {
-    "sub":   "配网设置",
-    "step1": "1. 连接下方热点",
-    "step2": "2. 打开弹出页面",
-    "step3": "3. 输入网络密码",
-    "wait":  "已连接 · 等待状态",
+    # setup screen (USB + agent onboarding) — the phrase is split into short
+    # lines so each one fits 240px with margin.
+    "tell":    "跟你的 AI 助手说:",
+    "p1":      "读取并设置",
+    "p2":      "我刚插上的",
+    "p3":      "USB 设备",
+    # done screen (after the agent provisions WiFi)
+    "done":    "配置完成",
+    "unplug":  "可拔线随身使用",
+    # connected-but-idle screen
+    "wait":    "已连接 · 等待状态",
 }
 
 font = ImageFont.truetype(FONT, SIZE)
