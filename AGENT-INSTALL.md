@@ -22,6 +22,45 @@ only stop to ask them when a step says so.
 
 ---
 
+## Setting up a plugged-in AgentLight **screen** (USB)?
+
+If the user said something like *"读取并设置我刚插上的 USB 设备"* / "set up the AgentLight
+screen I just plugged in", they have the **Pro Max screen** on USB. Do this, then you're done
+(it covers the hub install too):
+
+1. **Find the device.** It self-announces on a USB serial port. Easiest:
+   ```bash
+   git clone https://github.com/fengliucaizifyz-design/agentlight ~/agentlight 2>/dev/null || (cd ~/agentlight && git pull)
+   python3 ~/agentlight/firmware/agentlight-screen/tools/agentlight-usb.py find
+   # -> {"port":"/dev/cu.usbmodemXXXX","id":"..","wifi":"..","ip":"..","setup":".."}
+   ```
+   (Needs `pyserial`: `python3 -m pip install pyserial` if missing.) If it returns an error,
+   tell the user to check the USB cable is a **data** cable and re-plug.
+
+2. **Install the hub + your own adapter** — follow Step 1 then Step 2 below (build locally; no
+   notarization needed since it's a local build).
+
+3. **Get the user's Wi-Fi and provision the screen** (must be **2.4 GHz**; ESP32 has no 5 GHz):
+   - Get the current Wi-Fi name and its password from the Mac (the password is in the
+     Keychain — this pops a one-time "Allow" dialog the user approves, so they don't type it):
+     ```bash
+     SSID=$(ipconfig getsummary en0 | awk -F' SSID : ' '/ SSID :/{print $2; exit}')
+     PASS=$(security find-generic-password -wa "$SSID")   # user clicks Allow
+     ```
+   - **Confirm with the user**: "Connect the screen to «$SSID»?" If they're on a 5 GHz-only
+     network (or it fails), ask them for a 2.4 GHz SSID + password instead.
+   - Send it to the device:
+     ```bash
+     python3 ~/agentlight/firmware/agentlight-screen/tools/agentlight-usb.py provision --ssid "$SSID" --pass "$PASS"
+     # -> {"ok":true,"ip":".."}  (or {"ok":false,"error":".."})
+     ```
+
+4. **Done.** On `{"ok":true,...}` the screen shows "配置完成 / 可拔线随身使用". Tell the user:
+   **they can unplug the USB now — it runs on battery over Wi-Fi**, and the hub auto-discovers
+   it (mDNS). Confirm with a test: trigger a tool call and the screen should turn 🟡.
+
+---
+
 ## Step 1 — Install & start the hub (all platforms)
 
 The hub is a small menu-bar app (Swift, no third-party deps). Build it and set it to
