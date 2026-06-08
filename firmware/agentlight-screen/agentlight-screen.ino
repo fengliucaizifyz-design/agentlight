@@ -31,6 +31,7 @@
 #include <ArduinoJson.h>     // v7
 #include <TFT_eSPI.h>
 #include "zh_assets.h"       // pre-rendered Chinese line bitmaps (gen by tools/)
+#include "mascot_assets.h"   // RGB565 mascot sprites per state (gen by tools/)
 
 // ---- config ----------------------------------------------------------------
 static const char*    MDNS_HOST = "agentlight";  // -> http://agentlight.local
@@ -40,7 +41,9 @@ static const uint16_t HTTP_PORT = 80;
 static const char*    SETUP_URL = "https://github.com/fengliucaizifyz-design/agentlight";
 
 // ---- globals ---------------------------------------------------------------
-TFT_eSPI  tft = TFT_eSPI();
+TFT_eSPI    tft = TFT_eSPI();
+TFT_eSprite faceSpr = TFT_eSprite(&tft);   // off-screen buffer for flicker-free animation
+bool        sprReady = false;
 WebServer server(HTTP_PORT);
 
 // Last colour the hub asked for (kept so we can redraw / breathe later).
@@ -74,15 +77,58 @@ String apName() {
   return String(buf);
 }
 
-uint16_t scaledColor(uint8_t r, uint8_t g, uint8_t b, uint8_t bri) {
-  return tft.color565((uint16_t)r * bri / 255,
-                      (uint16_t)g * bri / 255,
-                      (uint16_t)b * bri / 255);
+// ---- character eyes (the desktop companion's face) -------------------------
+// The on-screen personality: state colour as the background + a pair of eyes
+// expressing the state. We map the hub's colour back to a state, so no hub
+// change / new protocol is needed for this demo.
+enum { EX_NONE, EX_IDLE, EX_WORKING, EX_CONFIRM, EX_ERROR, EX_OFFLINE };  // anon -> int
+int           curExpr = EX_NONE;
+unsigned long lastFrame = 0;     // animation frame throttle
+
+int mapColorToExpr(uint8_t r, uint8_t g, uint8_t b) {
+  if (r == 0 && g == 0 && b == 0)      return EX_OFFLINE;
+  if (g >= 150 && r <= 80)             return EX_IDLE;     // green
+  if (b >= 150 && r <= 80)             return EX_CONFIRM;  // blue
+  if (r >= 180 && g >= 100 && b <= 90) return EX_WORKING;  // amber
+  if (r >= 150 && g <= 80 && b <= 80)  return EX_ERROR;    // red
+  return EX_IDLE;
+}
+
+// Draw the mascot once, floating down by `bob` px. Uses the off-screen sprite
+// (flicker-free) when available, else a direct draw.
+void drawFaceFrame(int bob) {
+  int e = curExpr;
+  if (sprReady) {
+    faceSpr.fillSprite(MASCOT_BG[e]);
+    faceSpr.pushImage(0, bob, MASCOT_W, MASCOT_H, (uint16_t *)MASCOT_IMG[e], (uint16_t)MASCOT_KEY);
+    faceSpr.pushSprite(0, 0);
+  } else {
+    tft.fillScreen(MASCOT_BG[e]);
+    tft.pushImage(0, bob, MASCOT_W, MASCOT_H, (uint16_t *)MASCOT_IMG[e], (uint16_t)MASCOT_KEY);
+  }
+}
+
+// Switch expression: pale state-colour bg + the mascot.
+void setExpr(int e, uint16_t bg) {
+  curExpr = e;
+  if (e <= EX_NONE || e > EX_OFFLINE) { tft.fillScreen(TFT_BLACK); return; }
+  drawFaceFrame(0);
+}
+
+// Per-frame gentle float (~±4px, ~4.4s period). Needs the sprite to be smooth;
+// no-op without it or when a non-mascot screen is showing.
+void animateFace() {
+  if (!sprReady || curExpr <= EX_NONE || curExpr > EX_OFFLINE) return;
+  if (millis() - lastFrame < 50) return;
+  lastFrame = millis();
+  int bob = (int)lroundf(4.0f + 4.0f * sinf(millis() / 700.0f));   // 0..8 px
+  drawFaceFrame(bob);
 }
 
 void paint(uint8_t r, uint8_t g, uint8_t b, uint8_t bri, bool on) {
   curR = r; curG = g; curB = b; curBri = bri; curOn = on;
-  tft.fillScreen(on ? scaledColor(r, g, b, bri) : TFT_BLACK);
+  int e = on ? mapColorToExpr(r, g, b) : EX_OFFLINE;
+  if (e != curExpr) setExpr(e, 0);   // repaint only when the state changes
 }
 
 // Draw a pre-rendered Chinese line bitmap, horizontally centred, top at y.
@@ -94,6 +140,7 @@ void zhLine(const uint8_t* bmp, int w, int h, int y, uint16_t color) {
 // phrase to give their AI agent. Title/SSID are ASCII (built-in font); the
 // Chinese lines are pre-rendered bitmaps.
 void drawSetupScreen() {
+  curExpr = EX_NONE;                                        // stop the mascot animation
   tft.fillScreen(TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
   tft.setTextColor(TFT_CYAN, TFT_BLACK);
@@ -106,6 +153,7 @@ void drawSetupScreen() {
 
 // Shown briefly after the agent provisions WiFi (then the hub takes over).
 void drawDoneScreen() {
+  curExpr = EX_NONE;
   tft.fillScreen(TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
   zhLine(zh_done,   ZH_DONE_W,   ZH_DONE_H,    78, TFT_GREEN);  // 配置完成
@@ -126,6 +174,7 @@ void drawConnectingScreen(const char* ssid) {
 
 // Connected-but-idle screen, until the hub pushes the first colour.
 void drawWaitingScreen() {
+  curExpr = EX_NONE;
   tft.fillScreen(TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
   tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
@@ -260,6 +309,7 @@ void setup() {
 
   tft.init();
   tft.setRotation(0);   // TUNE: 0/1/2/3 if the image is rotated or mirrored
+  sprReady = (faceSpr.createSprite(240, 240) != nullptr);  // flicker-free animation buffer
   drawSetupScreen();
 
   // Non-blocking: reconnect to stored creds (if any). loop() keeps running so
@@ -286,8 +336,10 @@ void loop() {
     else                 { drawWaitingScreen(); }
   } else if (!connected && wasConnected) {   // dropped
     wasConnected = false;
+    curExpr = EX_NONE;                        // stop the face; show setup screen
     drawSetupScreen();
   }
 
   if (servicesStarted) server.handleClient();
+  animateFace();                              // gentle float; no-op unless a face is active
 }
