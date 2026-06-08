@@ -47,8 +47,12 @@ bool    curOn = false;
 // Lifecycle / serial state.
 bool          servicesStarted = false;   // mDNS + HTTP server started once
 bool          wasConnected = false;      // edge-detect WiFi connect/drop
+bool          justProvisioned = false;   // set by a serial wifi cmd -> show "done"
 unsigned long lastBanner = 0;            // self-announce throttle
+unsigned long bootMs = 0;                // boot time; hold setup screen briefly
 String        serialLine;                // accumulates one serial command line
+
+static const unsigned long SETUP_DWELL_MS = 5000;  // min time the setup screen shows at boot
 
 // 4-hex device id from the MAC, e.g. "9CF5".
 String deviceId() {
@@ -83,19 +87,28 @@ void zhLine(const uint8_t* bmp, int w, int h, int y, uint16_t color) {
   tft.drawBitmap((240 - w) / 2, y, bmp, w, h, color);
 }
 
-// Setup-mode screen (shown until WiFi is provisioned). Slice 1 keeps it a plain
-// placeholder; slice 2 replaces it with the polished Chinese phrase screen
-// ("跟你的 AI 助手说:读取并设置我刚插上的 USB 设备") via the bitmap pipeline.
+// Setup-mode screen (shown until WiFi is provisioned): tells the user the one
+// phrase to give their AI agent. Title/SSID are ASCII (built-in font); the
+// Chinese lines are pre-rendered bitmaps.
 void drawSetupScreen() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
   tft.setTextColor(TFT_CYAN, TFT_BLACK);
-  tft.drawString("AgentLight", 120, 78, 4);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.drawString("setup mode", 120, 108, 2);
+  tft.drawString("AgentLight", 120, 18, 4);                // title
+  zhLine(zh_tell, ZH_TELL_W, ZH_TELL_H,  50, TFT_WHITE);   // 跟你的 AI 助手说:
+  zhLine(zh_p1,   ZH_P1_W,   ZH_P1_H,    90, TFT_YELLOW);  // 读取并设置
+  zhLine(zh_p2,   ZH_P2_W,   ZH_P2_H,   120, TFT_YELLOW);  // 我刚插上的
+  zhLine(zh_p3,   ZH_P3_W,   ZH_P3_H,   150, TFT_YELLOW);  // USB 设备
+}
+
+// Shown briefly after the agent provisions WiFi (then the hub takes over).
+void drawDoneScreen() {
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextDatum(MC_DATUM);
+  zhLine(zh_done,   ZH_DONE_W,   ZH_DONE_H,    78, TFT_GREEN);  // 配置完成
+  zhLine(zh_unplug, ZH_UNPLUG_W, ZH_UNPLUG_H, 118, TFT_WHITE);  // 可拔线随身使用
   tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  tft.drawString("tell your AI agent to", 120, 138, 2);
-  tft.drawString("read & set up this USB device", 120, 158, 1);
+  tft.drawString(WiFi.localIP().toString(), 120, 152, 2);
 }
 
 // Shown while joining WiFi after the agent sends credentials.
@@ -213,6 +226,7 @@ void processCommand(const String& line) {
     unsigned long t0 = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - t0 < 20000) delay(200);
     if (WiFi.status() == WL_CONNECTED) {
+      justProvisioned = true;              // -> loop() shows the "done" screen
       Serial.printf("{\"ok\":true,\"ip\":\"%s\"}\n", WiFi.localIP().toString().c_str());
     } else {
       Serial.println("{\"ok\":false,\"error\":\"connect timeout\"}");
@@ -249,6 +263,7 @@ void setup() {
   // serial provisioning works even when there are no creds yet.
   WiFi.mode(WIFI_STA);
   WiFi.begin();
+  bootMs = millis();
 }
 
 void loop() {
@@ -257,10 +272,15 @@ void loop() {
   if (millis() - lastBanner > 2000) { lastBanner = millis(); emitBanner(); }
 
   bool connected = (WiFi.status() == WL_CONNECTED);
-  if (connected && !wasConnected) {          // just came online
+  if (connected) startServices();            // start mDNS+HTTP asap (idempotent)
+
+  // Hold the setup/welcome screen for a moment at cold boot so it's readable;
+  // a fresh serial provision (justProvisioned) skips the wait and shows "done".
+  bool dwellDone = justProvisioned || (millis() - bootMs >= SETUP_DWELL_MS);
+  if (connected && !wasConnected && dwellDone) {
     wasConnected = true;
-    startServices();
-    drawWaitingScreen();
+    if (justProvisioned) { justProvisioned = false; drawDoneScreen(); }
+    else                 { drawWaitingScreen(); }
   } else if (!connected && wasConnected) {   // dropped
     wasConnected = false;
     drawSetupScreen();
