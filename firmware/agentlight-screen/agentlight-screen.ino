@@ -35,6 +35,9 @@
 // ---- config ----------------------------------------------------------------
 static const char*    MDNS_HOST = "agentlight";  // -> http://agentlight.local
 static const uint16_t HTTP_PORT = 80;
+// Where the agent should read the setup procedure (self-describing; test phase —
+// no signing/trust yet). Advertised in the serial banner.
+static const char*    SETUP_URL = "https://github.com/fengliucaizifyz-design/agentlight";
 
 // ---- globals ---------------------------------------------------------------
 TFT_eSPI  tft = TFT_eSPI();
@@ -195,9 +198,9 @@ void startServices() {
 // any other USB serial ports. One line, ~every 2s.
 void emitBanner() {
   bool up = (WiFi.status() == WL_CONNECTED);
-  Serial.printf("AGENTLIGHT id=%s proto=1 wifi=%s ip=%s\n",
+  Serial.printf("AGENTLIGHT id=%s proto=1 wifi=%s ip=%s setup=%s\n",
                 deviceId().c_str(), up ? "connected" : "setup",
-                up ? WiFi.localIP().toString().c_str() : "0.0.0.0");
+                up ? WiFi.localIP().toString().c_str() : "0.0.0.0", SETUP_URL);
 }
 
 // Handle one JSON command line from the agent (over USB serial).
